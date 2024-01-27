@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Home</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='tailwind.css')}}" />
+    <script>
+        window.onload = function() {
+            var inputs = Array.from(document.querySelectorAll('input.input'));
+            inputs.forEach((input, index) => {
+                input.addEventListener('keyup', function(event) {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        if (index < inputs.length - 1) {
+                            inputs[index + 1].focus();
+                        } else {
+                            // Only submit the form if 'Enter' is pressed in the last input box
+                            document.querySelector('form').submit();
+                        }
+                    }
+                    if (event.key === 'Backspace') {
+                        event.preventDefault();
+                        if (index > 0) {
+                            inputs[index -1].focus();
+                        }
+                    }
+                });
+            });
+        
+            document.querySelector('form').addEventListener('submit', function(event) {
+                event.preventDefault();
+                let guess = inputs.map(input => input.value).join('');
+                fetch('/submit', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ guess: guess }),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Success:', data);
+                })
+                .catch((error) => {
+                    console.error('Error:', error);
+                });
+            });
+        };
+    </script>
+</head>
+<body>
+    <h1 class="flex">Wordle</h1>
+    <ul>
+    {% for item in data %}
+        <li>{{ item }}</li>
+    {% endfor %}
+    </ul>
+    <form class="flex">
+        {% for _ in data %}
+            <input type="text" class="input" maxlength="1">
+        {% endfor %}
+        <input type="submit" value="Submit">
+    </form>
+    <h1>{{word}}</h1>
+</body>
+</html>
