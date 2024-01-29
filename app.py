@@ -27,12 +27,12 @@ def submit():
     guess = data['guess']
 
     statuses = []
+    print(guess, statuses)
     for i, char in enumerate(guess):
-        if char in current_word:
-            if current_word.index(char) == i:
-                statuses.append('correct')
-            else:
-                statuses.append('yellow')
+        if char == current_word[i]:
+            statuses.append('correct')
+        elif char in current_word:
+            statuses.append('yellow')
         else:
             statuses.append('incorrect')
 
