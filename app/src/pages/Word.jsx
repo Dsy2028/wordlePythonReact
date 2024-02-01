@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
+import { containsLetters } from "../exports/Regex";
 
 export default function Word() {
   const [word, setWord] = useState("");
@@ -13,8 +14,13 @@ export default function Word() {
   const [count, setCount] = useState(0);
   const [gamesWon, setGamesWon] = useState(0);
   const [gamesLost, setGamesLost] = useState(0);
+  const [incorrect, setIncorrect] = useState()
+  const [noNumbers, setNoNumbers] = useState();
+  const [noBad, setNoBad] = useState();
+  
   // let count2 = 0;
   // console.log(test)
+//  console.log(inputs)
   useEffect(() => {
     fetch("http://127.0.0.1:5000/api/start", {
       method: "POST",
@@ -25,38 +31,34 @@ export default function Word() {
       .then((response) => response.json())
       .then((data) => {
         setWord(data);
-
         setInputs(
           new Array(6)
             .fill()
-            .map(() => new Array(data.target_word.length).fill(""))
+            .map(() => new Array(data.word.length).fill(""))
         );
         let count = localStorage.getItem("gamesPlayed");
-        // If gamesPlayed is not set in localStorage, default to 0
         count = count ? Number(count) : 0;
-        // Increment the count
         count += 1;
-        console.log(count);
-        // Store the incremented count back in localStorage
+       // console.log(count);
         localStorage.setItem("gamesPlayed", count);
-        // Update the state
         setCount(count);
         let wonCount = localStorage.getItem("gamesWon");
         let lostCount = localStorage.getItem("gamesLost");
         wonCount = wonCount ? Number(wonCount) : 0;
         lostCount = lostCount ? Number(lostCount) : 0;
-        // Update the state
         setGamesWon(wonCount);
         setGamesLost(lostCount);
       })
       .catch((error) => console.error("Error:", error));
   }, []);
   //console.log(count)
+  
   useEffect(() => {
     const newJoinWords = inputs.map((inputRow) => {
       // console.log(inputRow);
       return inputRow.join("");
     });
+    //console.log(newJoinWords)
     setJoinWord(newJoinWords);
   }, [inputs]);
   useEffect(() => {
@@ -65,7 +67,7 @@ export default function Word() {
     }
   }, [focusedInput]);
   useEffect(() => {
-    console.log(statuses.length)
+   // console.log(statuses.length)
     if (
       statuses.length > 0 &&
       statuses[statuses.length - 1].every((status) => status === "correct")
@@ -78,23 +80,28 @@ export default function Word() {
       setOpen(true);
     } 
   }, [statuses]);
+ // console.log(inputs)
   const handleSubmit = (row, index) => async (event) => {
     event.preventDefault();
     event.stopPropagation();
-    const wordToSubmit = inputs[row].join("");
-    // console.log(wordToSubmit);
+    const wordGuess = inputs[row].join("");
     try {
       const res = await fetch(`http://127.0.0.1:5000/api/submit`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ guess: wordToSubmit }),
+        body: JSON.stringify({ guess: wordGuess }),
       });
       const data = await res.json();
       const newStatuses = [...statuses];
       newStatuses[row] = data.statuses;
       setStatuses(newStatuses);
+      setIncorrect((prevIncorrect) => {
+        const newIncorrect = [...(prevIncorrect || []), ...data.incorrectChars];
+        // remove duplicates
+        return [...new Set(newIncorrect)];
+      });
       if (row === inputs.length - 1) {
         setLast(true);
       }
@@ -102,6 +109,7 @@ export default function Word() {
       console.error(error);
     }
   };
+ // console.log(incorrect)
   const handleInputChange = (row, index) => (event) => {
     const newInputs = [...inputs];
     newInputs[row][index] = event.target.value;
@@ -126,14 +134,16 @@ export default function Word() {
     if (event.key === "Backspace") {
       event.preventDefault();
       let nextRow = row;
+      //console.log('row', nextRow)
       let nextIndex = index - 1;
-      if (index >= inputs[row].length - 1) {
-        nextRow = row - 1;
-        nextIndex = 0;
-      }
+      //console.log(nextIndex);
       if (nextRow >= 0) {
         setFocusedInput({ row: nextRow, index: nextIndex });
       }
+    }
+    if(statuses[row] && statuses[row][index] === "numeric"){
+      setNoNumbers(true);
+      event.preventDefault();
     }
   };
   const closeOpen = () => {
@@ -144,9 +154,8 @@ export default function Word() {
     if (event.key === "Enter") {
       event.preventDefault();
     }
+     
   };
-  //console.log(focusedInput)
-  //  console.log(open)
   return (
     <>
       <div className="flex items-center  flex-col min-h-screen bg-slate-700">
@@ -160,6 +169,19 @@ export default function Word() {
           {open && (
             <div className="fixed opacity-100 inset-0 w-screen z-10 h-screen bg-black bg-opacity-50 outline"></div>
           )}
+          {noNumbers && (
+            <div className="fixed opacity-100 inset-0 w-screen z-10 h-screen bg-black bg-opacity-50 outline"></div>
+          )}
+          {noNumbers &&
+          <div className="fixed justify-center flex items-center inset-0 z-50 ">
+            <div className="bg-white w-[17rem] h-[8rem] rounded">
+            <h1 className="font-semibold text-2xl">No Numbers Or Special Characters</h1>
+            <div className="flex justify-end mt-[2rem] mr-[1rem]">
+            <button className="bg-green-500 px-2 rounded" onClick={() => setNoNumbers(false)}>Close</button>
+            </div>
+            </div>
+          </div>
+          }
           <div className="flex gap-2 flex-col">
             <form
               onSubmit={handleSubmit(
@@ -207,7 +229,7 @@ export default function Word() {
                                   <h1 className="text-center">{count - gamesWon}</h1>
                                 </div>
                               </div>
-                              <h1>Correct Word: {word && word.target_word}</h1>
+                              <h1>Correct Word: {word && word.word}</h1>
                               <div></div>
                             </div>
                           </div>
@@ -218,7 +240,7 @@ export default function Word() {
                     <input
                       key={index}
                       type="text"
-                      className={`w-[5rem] h-[5rem] border-4 text-center ${
+                      className={`w-[5rem] h-[5rem] border-4 text-center text-2xl ${
                         statuses[rowIndex] &&
                         statuses[rowIndex][index] === "correct"
                           ? "bg-green-500"
@@ -227,7 +249,7 @@ export default function Word() {
                           ? "bg-yellow-500"
                           : statuses[rowIndex] &&
                             statuses[rowIndex][index] == "incorrect"
-                          ? "bg-black text-white"
+                          ? "bg-slate-300 text-white"
                           : ""
                       }`}
                       maxLength="1"
@@ -244,13 +266,13 @@ export default function Word() {
                   ))}
                 </div>
               ))}
-              <input type="submit" style={{ display: "none" }} />
+              <input type="submit" style={{ display: "none" }}  />
             </form>
             <div className="mt-2 mb-4">
               {last && (
                 <div>
                   <h1 className="text-white text-xl font-semibold">
-                    Correct Word: {word && word.target_word}
+                    Correct Word: {word && word.word}
                   </h1>{" "}
                   <button
                     className="bg-green-500 text-white px-4 py-2 rounded-lg"
@@ -260,6 +282,16 @@ export default function Word() {
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+          <div className="mb-4">
+            <h1 className="text-white text-2xl">Incorrect Letters</h1>
+            <div className="flex gap-2 rounded flex-wrap max-w-[27rem]">
+            {incorrect && incorrect.map((key,index) => (
+              <div key={index} className="bg-slate-300 p-2 px-4">
+              <span className=" text-2xl">{key}</span>
+              </div>
+            ))}
             </div>
           </div>
         </div>
